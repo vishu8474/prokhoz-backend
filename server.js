@@ -1,4 +1,3 @@
-// backend/server.js
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -10,9 +9,9 @@ const app = express();
 app.use(cors({
   origin: [
     'http://localhost:8080',
-    'http://localhost:5173',
+    'http://localhost:5173', 
     'http://localhost:5174',
-    /\.vercel\.app$/  // ALLOWS ALL VERCEL DEPLOYMENTS
+    /\.vercel\.app$/
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -21,7 +20,17 @@ app.use(cors({
 
 app.use(express.json());
 
-// Health check
+// Health check - ADD THIS ROUTE AT ROOT LEVEL
+app.get('/', (req, res) => {
+  res.json({ 
+    status: 'OK', 
+    message: 'Prokhoz Backend Server is running',
+    database: mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Your existing health check
 app.get('/health', (req, res) => {
   res.json({ 
     status: 'OK', 
@@ -37,23 +46,19 @@ const connectDB = async () => {
     const mongoURI = process.env.MONGODB_URI;
     
     if (!mongoURI) {
-      console.log('❌ MONGODB_URI not found in .env file');
-      return;
+      console.log('❌ MONGODB_URI not found in environment variables');
+      throw new Error('MongoDB URI not configured');
     }
     
     console.log('🔄 Connecting to MongoDB Atlas...');
     
-    await mongoose.connect(mongoURI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
-    
+    await mongoose.connect(mongoURI);
     console.log('✅ MongoDB Atlas Connected Successfully!');
+    return true;
     
   } catch (error) {
     console.log('❌ MongoDB Atlas Connection Failed:', error.message);
-    console.log('💡 Check your MONGODB_URI in .env file');
-    console.log('💡 Make sure your IP is whitelisted in MongoDB Atlas');
+    throw error;
   }
 };
 
@@ -62,59 +67,24 @@ const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
 const productRoutes = require('./routes/products');
 const inquiryRoutes = require('./routes/inquiries');
-// In your server.js or app.js
 const contactRoutes = require('./routes/contact');
-app.use('/api', contactRoutes);
+
 // Use routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/inquiries', inquiryRoutes);
-// Add this to your server.js before the 404 handler
+app.use('/api/contact', contactRoutes);
 
-// Get all users (for admin purposes)
+// Your other routes...
 app.get('/api/admin/users', async (req, res) => {
-  try {
-    const User = require('./models/User');
-    const users = await User.find().select('-password'); // Exclude passwords
-    res.json({
-      success: true,
-      count: users.length,
-      users
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch users',
-      error: error.message
-    });
-  }
+  // ... existing code
 });
 
-// Delete all users (reset database)
 app.delete('/api/admin/reset-users', async (req, res) => {
-  try {
-    const User = require('./models/User');
-    const Product = require('./models/Product');
-    const Inquiry = require('./models/Inquiry');
-    
-    // Delete all data
-    await User.deleteMany({});
-    await Product.deleteMany({});
-    await Inquiry.deleteMany({});
-    
-    res.json({
-      success: true,
-      message: 'Database reset successfully! All users, products, and inquiries deleted.'
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Failed to reset database',
-      error: error.message
-    });
-  }
+  // ... existing code
 });
+
 // 404 Handler
 app.use('*', (req, res) => {
   res.status(404).json({
@@ -134,12 +104,21 @@ app.use((error, req, res, next) => {
 
 const PORT = process.env.PORT || 3000;
 
-// Start Server
-app.listen(PORT, async () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`🔗 Health check: http://localhost:${PORT}/health`);
-  console.log(`🌐 CORS enabled for frontend development`);
-  
-  // Connect to MongoDB Atlas
-  await connectDB();
-});
+// Start Server with better error handling
+const startServer = async () => {
+  try {
+    await connectDB();
+    
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`🚀 Server running on port ${PORT}`);
+      console.log(`🔗 Health check: http://0.0.0.0:${PORT}/`);
+      console.log(`🌐 CORS enabled for frontend development`);
+    });
+    
+  } catch (error) {
+    console.error('❌ Failed to start server:', error.message);
+    process.exit(1);
+  }
+};
+
+startServer();
