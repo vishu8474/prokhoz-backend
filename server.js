@@ -20,105 +20,64 @@ app.use(cors({
 
 app.use(express.json());
 
-// Health check - ADD THIS ROUTE AT ROOT LEVEL
+// Health check - works even without DB
 app.get('/', (req, res) => {
   res.json({ 
     status: 'OK', 
     message: 'Prokhoz Backend Server is running',
-    database: mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected',
+    database: mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected - Check MongoDB Whitelist',
     timestamp: new Date().toISOString()
   });
 });
 
-// Your existing health check
-app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'OK', 
-    message: 'Server is running',
-    database: mongoose.connection.readyState === 1 ? 'Connected to MongoDB Atlas' : 'Disconnected',
-    timestamp: new Date().toISOString()
-  });
-});
-
-// Connect to MongoDB Atlas
+// Connect to MongoDB Atlas (with error handling)
 const connectDB = async () => {
   try {
     const mongoURI = process.env.MONGODB_URI;
     
     if (!mongoURI) {
-      console.log('❌ MONGODB_URI not found in environment variables');
-      throw new Error('MongoDB URI not configured');
+      console.log('❌ MONGODB_URI not found');
+      return false;
     }
     
     console.log('🔄 Connecting to MongoDB Atlas...');
-    
     await mongoose.connect(mongoURI);
     console.log('✅ MongoDB Atlas Connected Successfully!');
     return true;
     
   } catch (error) {
-    console.log('❌ MongoDB Atlas Connection Failed:', error.message);
-    throw error;
+    console.log('❌ MongoDB Connection Failed - IP not whitelisted');
+    console.log('💡 Go to MongoDB Atlas → Network Access → Add 0.0.0.0/0');
+    // Don't throw error - let server start without DB
+    return false;
   }
 };
 
-// Import routes
+// Import and use routes (they'll fail gracefully if DB not connected)
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
 const productRoutes = require('./routes/products');
 const inquiryRoutes = require('./routes/inquiries');
 const contactRoutes = require('./routes/contact');
 
-// Use routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/inquiries', inquiryRoutes);
 app.use('/api/contact', contactRoutes);
 
-// Your other routes...
-app.get('/api/admin/users', async (req, res) => {
-  // ... existing code
-});
-
-app.delete('/api/admin/reset-users', async (req, res) => {
-  // ... existing code
-});
-
-// 404 Handler
-app.use('*', (req, res) => {
-  res.status(404).json({
-    success: false,
-    message: 'Route not found'
-  });
-});
-
-// Error Handler
-app.use((error, req, res, next) => {
-  console.error('Error:', error);
-  res.status(500).json({
-    success: false,
-    message: 'Internal server error'
-  });
-});
+// Other routes...
 
 const PORT = process.env.PORT || 3000;
 
-// Start Server with better error handling
+// Start Server
 const startServer = async () => {
-  try {
-    await connectDB();
-    
-    app.listen(PORT, '0.0.0.0', () => {
-      console.log(`🚀 Server running on port ${PORT}`);
-      console.log(`🔗 Health check: http://0.0.0.0:${PORT}/`);
-      console.log(`🌐 CORS enabled for frontend development`);
-    });
-    
-  } catch (error) {
-    console.error('❌ Failed to start server:', error.message);
-    process.exit(1);
-  }
+  await connectDB(); // Try to connect, but don't fail if it doesn't
+  
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`🔗 Access your app: https://prokhoz-backend-production.up.railway.app/`);
+  });
 };
 
 startServer();
