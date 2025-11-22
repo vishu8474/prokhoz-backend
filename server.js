@@ -9,15 +9,16 @@ const app = express();
 // Middleware
 app.use(cors({
   origin: [
-    'http://localhost:8080', 
-    'http://localhost:5173', 
+    'http://localhost:8080',
+    'http://localhost:5173',
     'http://localhost:5174',
-    'https://prokhoz-frontend.vercel.app' // Add your Vercel domain here
+    /\.vercel\.app$/  // ALLOWS ALL VERCEL DEPLOYMENTS
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
+
 app.use(express.json());
 
 // Health check
