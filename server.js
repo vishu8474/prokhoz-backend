@@ -132,7 +132,7 @@ app.use((error, req, res, next) => {
   });
 });
 
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT || 3000;
 
 // Start Server
 app.listen(PORT, async () => {
